@@ -11,7 +11,7 @@ namespace netcore_webview_test
 
     [ClassInterface(ClassInterfaceType.AutoDual)]
     [ComVisible(true)]
-    class WindowManager
+    public class WindowManager
     {
         private MainWindow mainWindow;
 
