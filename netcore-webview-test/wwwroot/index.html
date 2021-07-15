@@ -7,10 +7,19 @@
                 height: 100%;
                 margin: 0;
             }
+            button.active {
+                background-color: cornflowerblue;
+            }
         </style>
     </head>
     <body>
         Drag me! Not the title bar... but gently :)
+        <div>
+            <button id="websocketBtn">WebSocket.send</button>
+            <button id="postmsgBtn">window.postMessage</button>
+            <button id="hostobjBtn">webview.hostObjects</button>
+        </div>
+        <div id="logContainer"></div>
         <script src="test1.js"></script>
     </body>
 </html>

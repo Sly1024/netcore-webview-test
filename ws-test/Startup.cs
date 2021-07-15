@@ -87,10 +87,7 @@ namespace ws_test
                 {
                     ParseMessage(message);
                 } 
-                catch (Exception)
-                {
-
-                }
+                catch (Exception) { }
 
                 //Console.WriteLine($"msg: {message}");
 
