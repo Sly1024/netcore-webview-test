@@ -19,19 +19,19 @@ I tested this on my (aging) PC: Intel Core i3-2130 (3.4GHz), 8GB DDR3 RAM, Samsu
 
 |Test|WebSocket|postMessage|hostObjects|
 |---|---:|---:|---:|
-|Window Move|4.8 ms|4.7 ms|5.8 ms|
-|Throughput 1KB/msg|2.3 MB/s|2.7 MB/s|2.3 MB/s|
-|Throughput 10KB/msg|90 MB/s|18.3 MB/s|16 MB/s|
-|Throughput 100KB/msg|190 MB/s|40 MB/s|40 MB/s|
+|Window Move|5 ms|4.8 ms|4.8 ms|
+|Throughput 1KB/msg|2.1 MB/s|2.1 MB/s|2.3 MB/s|
+|Throughput 10KB/msg|15.3 MB/s|14.5 MB/s|15.5 MB/s|
+|Throughput 100KB/msg|36 MB/s|42 MB/s|42 MB/s|
 
 When I open the DevConsole (F12) the results are surprisingly different:
 
 |Test|WebSocket|postMessage|hostObjects|
 |---|---:|---:|---:|
-|Window Move|2.4 ms|2.7 ms|10 ms|
-|Throughput 1KB/msg|1.5 MB/s|1.7 MB/s|1.6 MB/s|
-|Throughput 10KB/msg|26 MB/s|12 MB/s|11 MB/s|
-|Throughput 100KB/msg|48 MB/s|36 MB/s|35 MB/s|
+|Window Move|9 ms|8 ms|8 ms|
+|Throughput 1KB/msg|1.6 MB/s|1.5 MB/s|1.6 MB/s|
+|Throughput 10KB/msg|10.5 MB/s|11.5 MB/s|11.5 MB/s|
+|Throughput 100KB/msg|30 MB/s|40 MB/s|40 MB/s|
 
 ## Conclusion
 I thought that the hostObjects approach would be the fastest, at least in terms of latency, but it turns out the WebSocket beats it in every aspect.

@@ -9,19 +9,16 @@ let currentChannel;
 let wsChannel = initWebSocket();
 let pmChannel = initPostMessage();
 let hoChannel = initHostObject();
-let mockChannel = initMockComm();
 
 const buttons = [
     document.querySelector('#websocketBtn'),
     document.querySelector('#postmsgBtn'),
     document.querySelector('#hostobjBtn'),
-    document.querySelector('#mockcommBtn'),
 ];
 
 buttons[0].addEventListener('click', selectWebSocket);
 buttons[1].addEventListener('click', selectPostMessage);
 buttons[2].addEventListener('click', selectHostObject);
-buttons[3].addEventListener('click', selectMockComm);
 
 
 document.querySelector('#through1Btn').addEventListener('click', () => testThroughput(1024));
@@ -49,12 +46,6 @@ function selectHostObject() {
     currentChannel = hoChannel;
     msgLatencySum = msgLatencyCnt = 0;
     setActiveButton(2);
-}
-
-function selectMockComm() {
-    currentChannel = mockChannel;
-    msgLatencySum = msgLatencyCnt = 0;
-    setActiveButton(3);
 }
 
 function setActiveButton(idx) {
@@ -103,52 +94,59 @@ function initDragging() {
 function initWebSocket() {
     var ws = new WebSocket('ws://localhost:5050/ws');
 
-    let resolveRequestPromise = null;
-    let rejectRequestPromise = null;
+    let msgCnt = 0;
+    const callbacks = {};
 
-    ws.onmessage = (evt) => resolveRequestPromise?.(evt.data);
-    ws.onerror = (evt) => rejectRequestPromise?.(evt.data);
+    ws.onmessage = (evt) => {
+        var response = JSON.parse(evt.data);
+        callbacks[response.msgId][response.success ? 'resolve' : 'reject'](response.data);
+        delete callbacks[response.msgId];
+    };
+
+    ws.onerror = (evt) => { console.log("WebSocket error", evt.data); };
 
     function wsrequest(message) {
         return new Promise((resolve, reject) => {
-            resolveRequestPromise = resolve;
-            rejectRequestPromise = reject;
-            ws.send(message);
+            callbacks[++msgCnt] = { resolve, reject };
+            message.msgId = msgCnt;
+            ws.send(JSON.stringify(message));
         });
     }
 
     return {
         setWindowPos(x, y) {
-            return wsrequest('move' + x + ',' + y);
+            return wsrequest({ action: 'moveWindow', data: ''+x+','+y });
         },
         sendMessage(msg) {
-            return wsrequest('message' + msg);
+            return wsrequest({ action: 'sendMessage', data: msg });
         }
     };
 }
 
 function initPostMessage() {
-    let resolveRequestPromise = null;
-    let rejectRequestPromise = null;
+    let msgCnt = 0;
+    const callbacks = {};
 
     window.chrome.webview.addEventListener('message', evt => {
-        if (evt.data == "OK") resolveRequestPromise(); else rejectRequestPromise();
+        var response = JSON.parse(evt.data);
+        callbacks[response.msgId][response.success ? 'resolve' : 'reject'](response.data);
+        delete callbacks[response.msgId];
     });
 
     function sendPostMsg(msg) {
         return new Promise((resolve, reject) => {
-            resolveRequestPromise = resolve;
-            rejectRequestPromise = reject;
+            callbacks[++msgCnt] = { resolve, reject };
+            msg.msgId = msgCnt;
             window.chrome.webview.postMessage(msg);
         });
     }
 
     return {
         setWindowPos(x, y) {
-            return sendPostMsg('move' + x + ',' + y);
+            return sendPostMsg({ action: 'moveWindow', data: '' + x + ',' + y });
         },
         sendMessage(msg) {
-            return sendPostMsg('message' + msg);
+            return sendPostMsg({ action: 'sendMessage', data: msg });
         }
     };
 }
@@ -160,17 +158,6 @@ function initHostObject() {
         },
         sendMessage(msg) {
             return bridge.SendMessage(msg);
-        }
-    };
-}
-
-function initMockComm() {
-    return {
-        setWindowPos(x, y) {
-            return Promise.resolve("OK");
-        },
-        sendMessage(msg) {
-            return Promise.resolve("OK");
         }
     };
 }

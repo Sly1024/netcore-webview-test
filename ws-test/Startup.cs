@@ -1,6 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
+using System.Dynamic;
 using System.Net;
 using System.Net.WebSockets;
 using System.Text;
@@ -11,6 +10,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Newtonsoft.Json;
 using static ws_test.WebSocketService;
 
 namespace ws_test
@@ -69,7 +69,7 @@ namespace ws_test
         private async Task Echo(HttpContext context, WebSocket webSocket)
         {
             // Console.WriteLine("websocket connected");
-            var buffer = new byte[1024 * 4];
+            var buffer = new byte[4 * 1024 * 1024];
 
             Task sendMsg(string message)
             {
@@ -79,33 +79,77 @@ namespace ws_test
             }
 
             WebSocketReceiveResult result;
-            while (!(result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer), CancellationToken.None)).CloseStatus.HasValue)
+            int currentOffset = 0;
+
+            while (!(result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer, currentOffset, buffer.Length - currentOffset), CancellationToken.None)).CloseStatus.HasValue)
             {
-                var message = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                currentOffset += result.Count;
+
+                if (!result.EndOfMessage)
+                {
+                    if (currentOffset >= buffer.Length) throw new IndexOutOfRangeException("The websocket message does not fit in the buffer.");
+                    continue;
+                }
+
+                var message = Encoding.UTF8.GetString(buffer, 0, currentOffset);
+                currentOffset = 0;
 
                 try
                 {
-                    ParseMessage(message);
+                    await ParseMessage(message, sendMsg);
                 } 
-                catch (Exception) { }
+                catch (Exception e) {
+                    Console.WriteLine("Error parsing websocket message", e);
+                }
 
                 //Console.WriteLine($"msg: {message}");
-
-                await sendMsg($"OK");
             }
             await webSocket.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
         }
 
-        private void ParseMessage(string message)
+
+        private class WsMessage
         {
-            if (message.StartsWith("move"))
+            public int msgId;
+            public string action;
+            public string data;
+        }
+
+        private class WsResponse
+        {
+            public int msgId;
+            public bool success;
+            public string data;
+        }
+
+        private Task ParseMessage(string message, Func<string, Task> sendMsg)
+        {
+            var obj = JsonConvert.DeserializeObject<WsMessage>(message);
+            var response = new WsResponse { msgId = obj.msgId };
+            try
             {
-                var xyCoord = message[4..].Split(',');
-                if (xyCoord.Length != 2) throw new ArgumentException($"Wrong message format");
-                var x = int.Parse(xyCoord[0]);
-                var y = int.Parse(xyCoord[1]);
-                WindowMoveRequest?.Invoke(x, y);
+                switch (obj.action)
+                {
+                    case "moveWindow":
+                        var xyCoord = obj.data.Split(',');
+                        if (xyCoord.Length != 2) throw new ArgumentException($"Wrong message format");
+                        var x = int.Parse(xyCoord[0]);
+                        var y = int.Parse(xyCoord[1]);
+                        WindowMoveRequest?.Invoke(x, y);
+                        response.data = "OK";
+                        break;
+                    case "sendMessage":
+                        response.data = "OK";
+                        break;
+                }
+                response.success = true;
+            } 
+            catch (Exception e)
+            {
+                response.success = false;
+                response.data = e.ToString();
             }
+            return sendMsg(JsonConvert.SerializeObject(response));
         }
     }
 }

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Web.WebView2.Core;
+using Newtonsoft.Json;
 using System;
 using System.Windows;
 
@@ -28,28 +29,61 @@ namespace netcore_webview_test
 
         }
 
-        void MessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
+        async void MessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
         {
-            var message = args.TryGetWebMessageAsString();
+            var message = args.WebMessageAsJson;
             try
             {
-                ProcessMessage(message);
+                ProcessMessage(message, webView.CoreWebView2.PostWebMessageAsString);
             }
-            catch (Exception) { }
-
-            webView.CoreWebView2.PostWebMessageAsString("OK");
+            catch (Exception e) 
+            {
+                Console.WriteLine("WebView2 postMessage error", e);
+            }
         }
 
-        public void ProcessMessage(string message)
+        private class PsMessage
         {
-            if (message.StartsWith("move"))
+            public int msgId;
+            public string action;
+            public string data;
+        }
+
+        private class PsResponse
+        {
+            public int msgId;
+            public bool success;
+            public string data;
+        }
+
+        private void ProcessMessage(string message, Action<string> sendMsg)
+        {
+            var obj = JsonConvert.DeserializeObject<PsMessage>(message);
+            var response = new PsResponse { msgId = obj.msgId };
+            try
             {
-                var xyCoord = message[4..].Split(',');
-                if (xyCoord.Length != 2) throw new ArgumentException($"Wrong message format");
-                var x = int.Parse(xyCoord[0]);
-                var y = int.Parse(xyCoord[1]);
-                MoveWindow(x, y);
+                switch (obj.action)
+                {
+                    case "moveWindow":
+                        var xyCoord = obj.data.Split(',');
+                        if (xyCoord.Length != 2) throw new ArgumentException($"Wrong message format");
+                        var x = int.Parse(xyCoord[0]);
+                        var y = int.Parse(xyCoord[1]);
+                        MoveWindow(x, y);
+                        response.data = "OK";
+                        break;
+                    case "sendMessage":
+                        response.data = "OK";
+                        break;
+                }
+                response.success = true;
             }
+            catch (Exception e)
+            {
+                response.success = false;
+                response.data = e.ToString();
+            }
+            sendMsg(JsonConvert.SerializeObject(response));
         }
 
         public void MoveWindow(int x, int y)
