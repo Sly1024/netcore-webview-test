@@ -34,8 +34,4 @@ When I open the DevConsole (F12) the results are surprisingly different:
 |Throughput 100KB/msg|30 MB/s|40 MB/s|40 MB/s|
 
 ## Conclusion
-I thought that the hostObjects approach would be the fastest, at least in terms of latency, but it turns out the WebSocket beats it in every aspect.
-
-An interesting result is that opening the DevConsole slows down the throughtput, but lowers the latency (not for hostObejcts though).
-
-However, this is a proof of concept. The backend doesn't do any processing, and maybe I'm doing the host object sharing the wrong way.
+The results are very close. WebSocket seems to be the slowest, probably doing all the JSON serialization/deserialization and all the message correlation on the JS side inefficiently.
