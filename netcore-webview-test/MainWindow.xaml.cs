@@ -33,9 +33,8 @@ namespace netcore_webview_test
         async void InitializeAsync()
         {
             await webView.EnsureCoreWebView2Async(null);
-            webView.CoreWebView2.NavigationCompleted += (s, e) => {
-                webView.CoreWebView2.AddHostObjectToScript("windowManager", windowManager);
-            };
+            webView.CoreWebView2.AddHostObjectToScript("windowManager", windowManager);
+            webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("window.windowManager = chrome.webview.hostObjects.windowManager;");
             webView.CoreWebView2.WebMessageReceived += MessageReceived;
         }
 

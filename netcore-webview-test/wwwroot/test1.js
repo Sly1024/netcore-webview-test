@@ -130,7 +130,7 @@ function initPostMessage() {
 function initHostObject() {
     return {
         setWindowPos(x, y) {
-            return chrome.webview.hostObjects.windowManager.MoveMainWindow(x, y);
+            return windowManager.MoveMainWindow(x, y);
         }
     };
 }
