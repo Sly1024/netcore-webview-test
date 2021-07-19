@@ -11,11 +11,11 @@ namespace netcore_webview_test
 
     [ClassInterface(ClassInterfaceType.AutoDual)]
     [ComVisible(true)]
-    public class WindowManager
+    public class WebViewJSBridge
     {
         private MainWindow mainWindow;
 
-        public WindowManager(MainWindow mainWindow)
+        public WebViewJSBridge(MainWindow mainWindow)
         {
             this.mainWindow = mainWindow;
         }
@@ -23,6 +23,11 @@ namespace netcore_webview_test
         public void MoveMainWindow(int x, int y)
         {
             mainWindow.MoveWindow(x, y);
+        }
+
+        public string SendMessage(string message)
+        {
+            return "OK";
         }
     }
 }

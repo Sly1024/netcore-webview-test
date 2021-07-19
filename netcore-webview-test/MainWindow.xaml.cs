@@ -1,18 +1,7 @@
 ﻿using Microsoft.Web.WebView2.Core;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+
 
 namespace netcore_webview_test
 {
@@ -21,12 +10,12 @@ namespace netcore_webview_test
     /// </summary>
     public partial class MainWindow : Window
     {
-        private WindowManager windowManager;
+        private WebViewJSBridge jsBridge;
 
         public MainWindow()
         {
             InitializeComponent();
-            windowManager = new WindowManager(this);
+            jsBridge = new WebViewJSBridge(this);
             InitializeAsync();
         }
 
@@ -34,7 +23,7 @@ namespace netcore_webview_test
         {
             await webView.EnsureCoreWebView2Async(null);
             webView.CoreWebView2.NavigationCompleted += (s, e) => {
-                webView.CoreWebView2.AddHostObjectToScript("windowManager", windowManager);
+                webView.CoreWebView2.AddHostObjectToScript("bridge", jsBridge);
             };
             webView.CoreWebView2.WebMessageReceived += MessageReceived;
         }

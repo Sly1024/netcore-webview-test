@@ -91,7 +91,7 @@ namespace ws_test
 
                 //Console.WriteLine($"msg: {message}");
 
-                await sendMsg($"ACK");
+                await sendMsg($"OK");
             }
             await webSocket.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
         }
