@@ -22,10 +22,10 @@ namespace netcore_webview_test
         async void InitializeAsync()
         {
             await webView.EnsureCoreWebView2Async(null);
-            webView.CoreWebView2.NavigationCompleted += (s, e) => {
-                webView.CoreWebView2.AddHostObjectToScript("bridge", jsBridge);
-            };
+            webView.CoreWebView2.AddHostObjectToScript("bridge", jsBridge);
+            webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync("window.bridge = chrome.webview.hostObjects.bridge;");
             webView.CoreWebView2.WebMessageReceived += MessageReceived;
+
         }
 
         void MessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)

@@ -156,10 +156,10 @@ function initPostMessage() {
 function initHostObject() {
     return {
         setWindowPos(x, y) {
-            return chrome.webview.hostObjects.bridge.MoveMainWindow(x, y);
+            return bridge.MoveMainWindow(x, y);
         },
         sendMessage(msg) {
-            return chrome.webview.hostObjects.bridge.SendMessage(msg);
+            return bridge.SendMessage(msg);
         }
     };
 }
