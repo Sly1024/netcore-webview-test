@@ -1,6 +1,6 @@
 ﻿using Microsoft.Web.WebView2.Core;
-using Newtonsoft.Json;
 using System;
+using System.Text.Json;
 using System.Windows;
 
 
@@ -44,21 +44,21 @@ namespace netcore_webview_test
 
         private class PsMessage
         {
-            public int msgId;
-            public string action;
-            public string data;
+            public int msgId { get; set; }
+            public string action { get; set; }
+            public string data { get; set; }
         }
 
         private class PsResponse
         {
-            public int msgId;
-            public bool success;
-            public string data;
+            public int msgId { get; set; }
+            public bool success { get; set; }
+            public string data { get; set; }
         }
 
         private void ProcessMessage(string message, Action<string> sendMsg)
         {
-            var obj = JsonConvert.DeserializeObject<PsMessage>(message);
+            var obj = JsonSerializer.Deserialize<PsMessage>(message);
             var response = new PsResponse { msgId = obj.msgId };
             try
             {
@@ -83,7 +83,7 @@ namespace netcore_webview_test
                 response.success = false;
                 response.data = e.ToString();
             }
-            sendMsg(JsonConvert.SerializeObject(response));
+            sendMsg(JsonSerializer.Serialize(response));
         }
 
         public void MoveWindow(int x, int y)

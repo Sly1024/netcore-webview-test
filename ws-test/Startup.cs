@@ -1,8 +1,9 @@
 using System;
-using System.Dynamic;
+using System.Buffers;
+using System.IO.Pipelines;
 using System.Net;
 using System.Net.WebSockets;
-using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Builder;
@@ -10,7 +11,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Newtonsoft.Json;
 using static ws_test.WebSocketService;
 
 namespace ws_test
@@ -66,65 +66,76 @@ namespace ws_test
             });
         }
 
+        private readonly ArrayPool<byte> _arrayPool = ArrayPool<byte>.Shared;
+
         private async Task Echo(HttpContext context, WebSocket webSocket)
         {
-            // Console.WriteLine("websocket connected");
-            var buffer = new byte[4 * 1024 * 1024];
+            //// Console.WriteLine("websocket connected");
 
-            Task sendMsg(string message)
+            ValueTask SendMessage(ReadOnlyMemory<byte> message)
             {
-                var byteCount = Encoding.UTF8.GetBytes(message, 0, message.Length, buffer, 0);
-
-                return webSocket.SendAsync(new ReadOnlyMemory<byte>(buffer, 0, byteCount), WebSocketMessageType.Text, true, CancellationToken.None).AsTask();
+                return webSocket.SendAsync(message, WebSocketMessageType.Text, true, CancellationToken.None);
             }
 
-            WebSocketReceiveResult result;
-            int currentOffset = 0;
+            var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
+            var messageLength = 0;
+            var responseBuffer = new ArrayBufferWriter<byte>();
 
-            while (!(result = await webSocket.ReceiveAsync(new ArraySegment<byte>(buffer, currentOffset, buffer.Length - currentOffset), CancellationToken.None)).CloseStatus.HasValue)
+            while (true)
             {
-                currentOffset += result.Count;
+                var mem = pipe.Writer.GetMemory(ReceiveBufferSize);
 
-                if (!result.EndOfMessage)
+                var receiveResult = await webSocket.ReceiveAsync(mem, CancellationToken.None);
+
+                if (receiveResult.MessageType == WebSocketMessageType.Close) break;
+
+                messageLength += receiveResult.Count;
+                pipe.Writer.Advance(receiveResult.Count);
+
+                if (receiveResult.EndOfMessage)
                 {
-                    if (currentOffset >= buffer.Length) throw new IndexOutOfRangeException("The websocket message does not fit in the buffer.");
-                    continue;
+                    await pipe.Writer.FlushAsync();
+                    while (pipe.Reader.TryRead(out var readResult))
+                    {
+                        if (readResult.Buffer.Length >= messageLength)
+                        {
+                            var messageBuffer = readResult.Buffer.Slice(readResult.Buffer.Start, messageLength);
+                            await ParseMessage(messageBuffer, responseBuffer);
+                            await SendMessage(responseBuffer.WrittenMemory);
+                            responseBuffer.Clear();
+                            pipe.Reader.AdvanceTo(messageBuffer.End);
+                            messageLength = 0;
+                            break;
+                        }
+
+                        if (readResult.IsCompleted) break;
+                    }
                 }
-
-                var message = Encoding.UTF8.GetString(buffer, 0, currentOffset);
-                currentOffset = 0;
-
-                try
-                {
-                    await ParseMessage(message, sendMsg);
-                } 
-                catch (Exception e) {
-                    Console.WriteLine("Error parsing websocket message", e);
-                }
-
-                //Console.WriteLine($"msg: {message}");
             }
-            await webSocket.CloseAsync(result.CloseStatus.Value, result.CloseStatusDescription, CancellationToken.None);
+
+            await webSocket.CloseAsync(webSocket.CloseStatus.Value, webSocket.CloseStatusDescription, CancellationToken.None);
         }
 
-
+        private const int ReceiveBufferSize = 4 * 1024;
+        
         private class WsMessage
         {
-            public int msgId;
-            public string action;
-            public string data;
+            public int msgId { get; set; }
+            public string action { get; set; }
+            public string data { get; set; }
         }
 
         private class WsResponse
         {
-            public int msgId;
-            public bool success;
-            public string data;
+            public int msgId { get; set; }
+            public bool success { get; set; }
+            public string data { get; set; }
         }
 
-        private Task ParseMessage(string message, Func<string, Task> sendMsg)
+        private Task ParseMessage(ReadOnlySequence<byte> messageBuffer, IBufferWriter<byte> responseBuffer)
         {
-            var obj = JsonConvert.DeserializeObject<WsMessage>(message);
+            var jsonReader = new Utf8JsonReader(messageBuffer);
+            var obj = JsonSerializer.Deserialize<WsMessage>(ref jsonReader);
             var response = new WsResponse { msgId = obj.msgId };
             try
             {
@@ -149,7 +160,10 @@ namespace ws_test
                 response.success = false;
                 response.data = e.ToString();
             }
-            return sendMsg(JsonConvert.SerializeObject(response));
+
+            using var jsonWriter = new Utf8JsonWriter(responseBuffer);
+            JsonSerializer.Serialize(jsonWriter, response);
+            return Task.CompletedTask;
         }
     }
 }
