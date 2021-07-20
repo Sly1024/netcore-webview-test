@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Net;
 using System.Net.WebSockets;
@@ -66,22 +67,15 @@ namespace ws_test
             });
         }
 
-        private readonly ArrayPool<byte> _arrayPool = ArrayPool<byte>.Shared;
-
         private async Task Echo(HttpContext context, WebSocket webSocket)
         {
-            //// Console.WriteLine("websocket connected");
-
-            ValueTask SendMessage(ReadOnlyMemory<byte> message)
-            {
-                return webSocket.SendAsync(message, WebSocketMessageType.Text, true, CancellationToken.None);
-            }
+            Debug.WriteLine("WebSocket connected");
 
             var pipe = new Pipe(new PipeOptions(pauseWriterThreshold: 0));
             var messageLength = 0;
             var responseBuffer = new ArrayBufferWriter<byte>();
 
-            while (true)
+            while (!webSocket.CloseStatus.HasValue)
             {
                 var mem = pipe.Writer.GetMemory(ReceiveBufferSize);
 
@@ -113,29 +107,36 @@ namespace ws_test
                 }
             }
 
-            await webSocket.CloseAsync(webSocket.CloseStatus.Value, webSocket.CloseStatusDescription, CancellationToken.None);
+            Debug.WriteLine($"WebSocket closed with status {webSocket.CloseStatus} {webSocket.CloseStatusDescription}");
+
+            ValueTask SendMessage(ReadOnlyMemory<byte> message)
+            {
+                return webSocket.SendAsync(message, WebSocketMessageType.Text, true, CancellationToken.None);
+            }
         }
 
         private const int ReceiveBufferSize = 4 * 1024;
-        
+
         private class WsMessage
         {
-            public int msgId { get; set; }
-            public string action { get; set; }
-            public string data { get; set; }
+            public int msgId;
+            public string action;
+            public string data;
         }
 
         private class WsResponse
         {
-            public int msgId { get; set; }
-            public bool success { get; set; }
-            public string data { get; set; }
+            public int msgId;
+            public bool success;
+            public string data;
         }
+
+        private static readonly JsonSerializerOptions JsonSerializerOptions = new JsonSerializerOptions { IncludeFields = true };
 
         private Task ParseMessage(ReadOnlySequence<byte> messageBuffer, IBufferWriter<byte> responseBuffer)
         {
             var jsonReader = new Utf8JsonReader(messageBuffer);
-            var obj = JsonSerializer.Deserialize<WsMessage>(ref jsonReader);
+            var obj = JsonSerializer.Deserialize<WsMessage>(ref jsonReader, JsonSerializerOptions);
             var response = new WsResponse { msgId = obj.msgId };
             try
             {
@@ -162,7 +163,7 @@ namespace ws_test
             }
 
             using var jsonWriter = new Utf8JsonWriter(responseBuffer);
-            JsonSerializer.Serialize(jsonWriter, response);
+            JsonSerializer.Serialize(jsonWriter, response, JsonSerializerOptions);
             return Task.CompletedTask;
         }
     }
