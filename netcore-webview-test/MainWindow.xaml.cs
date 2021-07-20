@@ -44,21 +44,23 @@ namespace netcore_webview_test
 
         private class PsMessage
         {
-            public int msgId { get; set; }
-            public string action { get; set; }
-            public string data { get; set; }
+            public int msgId;
+            public string action;
+            public string data;
         }
 
         private class PsResponse
         {
-            public int msgId { get; set; }
-            public bool success { get; set; }
-            public string data { get; set; }
+            public int msgId;
+            public bool success;
+            public string data;
         }
+
+        private static readonly JsonSerializerOptions JsonSerializerOptions = new JsonSerializerOptions { IncludeFields = true };
 
         private void ProcessMessage(string message, Action<string> sendMsg)
         {
-            var obj = JsonSerializer.Deserialize<PsMessage>(message);
+            var obj = JsonSerializer.Deserialize<PsMessage>(message, JsonSerializerOptions);
             var response = new PsResponse { msgId = obj.msgId };
             try
             {
@@ -83,7 +85,7 @@ namespace netcore_webview_test
                 response.success = false;
                 response.data = e.ToString();
             }
-            sendMsg(JsonSerializer.Serialize(response));
+            sendMsg(JsonSerializer.Serialize(response, JsonSerializerOptions));
         }
 
         public void MoveWindow(int x, int y)
